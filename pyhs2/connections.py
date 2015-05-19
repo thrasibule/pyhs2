@@ -3,8 +3,7 @@ import sys
 from thrift.protocol.TBinaryProtocol import TBinaryProtocol
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
-import sasl
-from cloudera.thrift_sasl import TSaslClientTransport
+from thrift.transport.TTransport import TSaslClientTransport
 
 from TCLIService import TCLIService
 
@@ -29,18 +28,16 @@ class Connection(object):
         if authMechanism == 'NOSASL':
             transport = TBufferedTransport(socket)
         else:
-            sasl_mech = 'PLAIN'
-            saslc = sasl.Client()
-            saslc.setAttr("username", user)
-            saslc.setAttr("password", password)
             if authMechanism == 'KERBEROS':
-                krb_host,krb_service = self._get_krb_settings(host, configuration)
                 sasl_mech = 'GSSAPI'
-                saslc.setAttr("host", krb_host)
-                saslc.setAttr("service", krb_service)
-
-            saslc.init()
-            transport = TSaslClientTransport(saslc, sasl_mech, socket)
+                krb_host, krb_service = self._get_krb_settings(host, configuration)
+                transport = TSaslCLientTransport(socket, host=krb_host, service=krb_service,
+                                                 mechanism=sasl_mech,
+                                                 username=user, password=password)
+            else:
+                transport = TSaslCLientTransport(socket, host=host, service=None,
+                                                 mechanism=authMechanism,
+                                                 username=user, password=password)
 
         self.client = TCLIService.Client(TBinaryProtocol(transport))
         transport.open()
@@ -49,7 +46,7 @@ class Connection(object):
         if database is not None:
             with self.cursor() as cur:
                 query = "USE {0}".format(database)
-                cur.execute(query) 
+                cur.execute(query)
 
     def __enter__(self):
         return self
